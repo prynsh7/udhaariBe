@@ -23,10 +23,14 @@ const userSchema=new mongoose.Schema({
         minlength:[6,"Password should be of atleast 6 characters."],
         // select:false  // so that password will not go with model , we don't have to do user.password=undefined
     },
+    status:{
+        type:String,
+        default:"Active"
+    },
     profileImage:{
         type: String,
     },
-    Currency:{
+    currency:{
         type: String,
     },
     forgotPasswordToken:String,
@@ -52,7 +56,7 @@ userSchema.methods.isValidatedPassword= async function(usersendPassword, passwor
 // create and return jwt token
 userSchema.methods.getJwtToken=function(){
     return jwt.sign({id:this._id},process.env.JWT_SECRET,{
-        expiresIn:process.env.JWT_EXPIRY
+        expiresIn:process.env.JWT_EXPIRE
     })
 }
 
