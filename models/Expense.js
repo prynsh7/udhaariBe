@@ -1,49 +1,44 @@
-import mongoose  from "mongoose";
+import mongoose from "mongoose";
 
 const expenseSchema = new mongoose.Schema({
-    userId : {
+    friendId: {
         type: String,
-        ref:'User',
+        ref: 'Friend',
     },
-    peerId : {
+    description: {
         type: String,
-        ref:'User',
+        required: false
     },
-    description:{
-        type:String,
-        required:false
+    status: {
+        type: String,
+        default: "Active",
     },
-    status:{
-        type:String,
-        default:"Active",
+    amount: {
+        type: Number,
+        required: true,
     },
-    amount:{
-        type:Number,
-        required:true,
+    settlementAt: {
+        type: Date,
     },
-    settlementAt:{
-        type:Date,
+    settledBy: {
+        type: Number,
+        ref: 'User',
     },
-    settledBy:{
-        type:Number,
-        ref:'User',
+    settlementType: {
+        type: String,
+        enum: ["borrowed_full", "borrowed_half", "lend_full", "lend_half"],
+        default: "borrowed_half",
+        required: true,
     },
-    settlementType:{
-        type:[{
-            type:String,
-            enum:["borrowed_full", "borrowed_half", "lend_full", "lend_half"]
-        }],
-        default:["borrowed_half"],
-        required:true,
+    createdAt: {
+        type: Date,
+        default: Date.now(),
     },
-    createdAt:{
-        type:Date,
-        default:Date.now(),
-    },
-    updatedAt:{
-        type:Date,
+    updatedAt: {
+        type: Date,
     }
 })
-expenseSchema.index({ userId: 1, peerId: 1 }, { unique: true });
+
+
 const Expense = mongoose.model("Expense", expenseSchema);
 export default Expense;
