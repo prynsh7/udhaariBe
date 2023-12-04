@@ -6,16 +6,21 @@ export const addFriend = async(req, res) =>{
     const {peerMail} = req.body;
     try {
         let peer = await User.findOne({email:peerMail});
+        let user = await User.findOne({email:email});
         if(!peer){
             peer = await User.create({
                 username:peerMail,
                 password:peerMail,
-                email:peerMail
+                email:peerMail,
+                friends:[],
+                status:"Inactive"
             })
         }
 
         const userId = req.user._id.toString();
         const peerId = peer._id.toString();
+        const peerName = peer.username;
+        const userName = req.user.username;
 
         if(userId === peerId){
             return res.status(401).json({
@@ -24,29 +29,33 @@ export const addFriend = async(req, res) =>{
             })
         }
 
-        const peerCheck = await Expense.find({
-            userId:userId,
-            peerId:peerId,
-        })
-
-        if(peerCheck){
-            return res.status(400).json({
-                success:false,
-                message:"Peer is already a friend."
-            })
+        const friendExists = user.friends.some(
+            (friend) => friend.id === peerId && friend.username === peerName
+        );
+        
+        if (friendExists) {
+            return res.status(401).json({
+                success: false,
+                message: "Friend already exists.",
+            });
         }
+        
+        user.friends.push({
+            id: peerId,
+            username: peerName,
+        });
 
-        const expense = await Expense.create({
-            userId:userId,
-            peerId:peerId,
-            description:"",
-            status:"Inactive",
-            amount:0
-        })
+        peer.friends.push({
+            id: userId,
+            username: userName,
+        });
+
+        await user.save();
+        await peer.save();
 
         return res.status(200).json({
             success:true,
-            data:expense,
+            data:user,
             message:"Friend added successfully."
         })
     } catch (error) {
@@ -60,32 +69,11 @@ export const addFriend = async(req, res) =>{
 export const getFriends = async(req, res) =>{
     const {id} = req.user;
     try {
-        const friends = await Expense.distinct({
-            $or:[
-                {userId:id},
-                {peerId:id}
-            ],
-            $or:[
-                {status:"Inactive"}
-            ]
-        });
-
-        let friendData = [];
-        for(let i=0; i<friends.length; i++)
-        {
-            if(friends[i].userId===id){
-                const data = await User.findById(friends[i].peerId);
-                friendData.push(data);
-            }else{
-                const data = await User.findById(friends[i].userId);
-                friendData.push(data);
-            }
-        }
-
+        const user = await User.findById(id);
         return res.status(200).json({
             success:true,
-            message:"List of friends fetched.",
-            data:friendData
+            message:"Friends fetched successfully",
+            data: user.friends
         })
     } catch (error) {
         console.log(error);
@@ -98,10 +86,10 @@ export const getFriends = async(req, res) =>{
 
 export const createExpense = async(req, res) =>{
     const {id} = req.user;
-    const {mail, description, settlementType} = req.body; // peerId
+    const {peerId, description, settlementType} = req.body;
     let {amount} = req.body;
 
-    if(!mail || !description || !amount || !settlementType){
+    if(!peerId || !description || !amount || !settlementType){
         return res.status(400).json({
             success:false,
             message:"All fields are required."
@@ -109,15 +97,27 @@ export const createExpense = async(req, res) =>{
     }
 
     try {
-        const peer = await User.findOne({email:mail});
-        if(!peer){
-            return res.status(400).json({
+        if(id === peerId){
+            return res.status(401).json({
                 success:false,
-                message:"Peer not found"
+                message:"Cant create an expense with yourself."
             })
         }
-        const peerId = peer._id.toString();
 
+        const friendExists = req.user.friends.some(
+            (friend) => friend.id === peerId
+        );
+
+        if(!friendExists)
+        {
+            return res.status(401).json({
+                success:false,
+                message:"No friend exists."
+            })
+        }
+
+        const peer = await User.findById(peerId);
+        
         if(settlementType==="borrowed_half"){
             amount = -(amount/2);
         }else if(settlementType==="borrowed_full"){
@@ -129,6 +129,7 @@ export const createExpense = async(req, res) =>{
         const expense = await Expense.create({
             userId : id,
             peerId : peerId,
+            peerName : peer.username,
             description : description,
             amount : amount,
             settlementType : settlementType
@@ -151,121 +152,26 @@ export const getExpenses = async(req, res) =>{
     const {id} = req.user;
     const {settlementType} = req.body;
     try {
-        let peerData = [];
-        if(filter === "You owe"){
-            const filteredResponse = await Expense.find({
-                $or:[
-                    {userId:id},
-                    {peerId:id}
-                ],
-                amount:{$gt:0}
-            });
-
-
-            // username , peername
-            for(let i=0; i<filteredResponse.length; i++)
-            {
-                if(filteredResponse[i].userId===id)
-                {
-                    const peer = await User.findById(filteredResponse[i].peerId);
-                    const obj = {
-                        peerName : peer.username,
-                        peerMail : peer.email,
-                        data : filteredResponse[i]
-                    }
-                    peerData.push(obj);
-                }else{
-                    const peer = await User.findById(filteredResponse[i].userId);
-                    const obj = {
-                        peerName : peer.username,
-                        peerMail : peer.email,
-                        data : filteredResponse[i]
-                    }
-                    peerData.push(obj);
-                }
-            }
-            return res.status(200).json({
-                success:true,
-                message:"Expense list fetched successfully.",
-                data : peerData
-            })
-        }
-
-        if(filter === "Owe you"){
-            const filteredResponse = await Expense.find({
-                $or:[
-                    {userId:id},
-                    {peerId:id}
-                ],
-                amount:{$lt:0}
-            });
-
-            for(let i=0; i<filteredResponse.length; i++)
-            {
-                if(filteredResponse[i].userId===id)
-                {
-                    const peer = await User.findById(filteredResponse[i].peerId);
-                    const obj = {
-                        peerName : peer.username,
-                        peerMail : peer.email,
-                        data : filteredResponse[i]
-                    }
-                    peerData.push(obj);
-                }else{
-                    const peer = await User.findById(filteredResponse[i].userId);
-                    const obj = {
-                        peerName : peer.username,
-                        peerMail : peer.email,
-                        data : filteredResponse[i]
-                    }
-                    peerData.push(obj);
-                }
-            }
-
-            return res.status(200).json({
-                success:true,
-                message:"Expense list fetched successfully.",
-                data : peerData
-            })
-        }
-
         const filteredResponse = await Expense.find({
-            $or : [
+            settlementType:{$in: [settlementType] },
+            $or:[
                 {userId:id},
                 {peerId:id}
-            ],
-            status:{
-                $nin: ["Inactive", "Inactive:UNREG"]
-            }
-        });
+            ]
+        }).populate('userId', 'username').populate('peerId', 'username');
 
-        for(let i=0; i<filteredResponse.length; i++)
-        {
-            if(filteredResponse[i].userId===id)
-            {
-                const peer = await User.findById(filteredResponse[i].peerId);
-                const obj = {
-                    peerName : peer.username,
-                    peerMail : peer.email,
-                    data : filteredResponse[i]
-                }
-                peerData.push(obj);
-            }else{
-                const peer = await User.findById(filteredResponse[i].userId);
-                const obj = {
-                    peerName : peer.username,
-                    peerMail : peer.email,
-                    data : filteredResponse[i]
-                }
-                peerData.push(obj);
-            }
+        if(filteredResponse.length===0){
+            return res.status(401).json({
+                success:false,
+                message:"No expense found."
+            })
         }
 
         return res.status(200).json({
             success:true,
-            message:"Expense list fetched successfully.",
-            data : peerData
-        })
+            message:"Expenses fetched successfully.",
+            data:filteredResponse
+        });
     } catch (error) {
         console.log(error);
         return res.status(500).json({
@@ -274,3 +180,4 @@ export const getExpenses = async(req, res) =>{
         })
     }
 }
+

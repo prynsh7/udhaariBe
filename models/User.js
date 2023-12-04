@@ -27,6 +27,17 @@ const userSchema=new mongoose.Schema({
         type:String,
         default:"Active"
     },
+    friends:[
+        {
+            id:{
+                type:String,
+                ref:'User'
+            },
+            username:{
+                type:String
+            }
+        }
+    ],
     profileImage:{
         type: String,
     },
