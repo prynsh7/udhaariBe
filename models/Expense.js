@@ -2,28 +2,27 @@ import mongoose  from "mongoose";
 
 const expenseSchema = new mongoose.Schema({
     userId : {
-        type: Number,
+        type: String,
         ref:'User',
     },
     peerId : {
-        type: Number,
+        type: String,
         ref:'User',
     },
     description:{
         type:String,
-        required:true,
+        required:false
     },
     status:{
         type:String,
         default:"Active",
     },
-    Amount:{
-        type:Double,
+    amount:{
+        type:Number,
         required:true,
     },
     settlementAt:{
         type:Date,
-        required:true,
     },
     settledBy:{
         type:Number,
@@ -45,5 +44,6 @@ const expenseSchema = new mongoose.Schema({
         type:Date,
     }
 })
+expenseSchema.index({ userId: 1, peerId: 1 }, { unique: true });
 const Expense = mongoose.model("Expense", expenseSchema);
 export default Expense;

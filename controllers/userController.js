@@ -7,7 +7,6 @@ import bigPromise from "../middlewares/bigPromise.js"
 export const createUser = bigPromise(async(req,res,next)=>{
     const {username,email,password}=req.body;
     if((!username) || (!email) || (!password)){
-        console.log(username+" "+email+" "+password);
         return res.status(400).json({
             success:false,
             message:"All fields are required!"
@@ -61,10 +60,13 @@ export const authUser = async(req, res) =>{
             success:false,
             message:"Invalid email or password"
         })
+
+        const token = await user.getJwtToken();
     
         return res.status(200).json({
             success:true,
             message:"Logged in successfully.",
+            data:user, token
         })
     } catch (error) {
         console.log(error);
@@ -75,7 +77,7 @@ export const authUser = async(req, res) =>{
 }
 
 export const getProfile = async(req, res) =>{
-    const {email} = req.body;
+    const {email} = req.user;
     try {
         const user = await User.findOne({email:email});
         if(!user){
@@ -97,7 +99,8 @@ export const getProfile = async(req, res) =>{
 }
 
 export const updateProfile = async(req,res) =>{
-    const {email, newStuff} = req.body;
+    const {username, profileImage, currency} = req.body;
+    const {email} = req.user;
     try {
         const user = await User.findOne({email:email});
         if(!user){
@@ -106,8 +109,13 @@ export const updateProfile = async(req,res) =>{
                 message:"No user found.",
             })
         }
-        Object.assign(user, newStuff);
-        user.save();
+        const obj = {
+            username,
+            profileImage,
+            currency
+        }
+        Object.assign(user, obj);
+        await user.save();
         return res.status(200).json({
             success:true,
             message:"Updated successfully."
