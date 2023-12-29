@@ -1,9 +1,13 @@
-import express  from "express"
-import  dotenv  from "dotenv"
+import express from "express"
+import dotenv from "dotenv"
 import connectDB from "./config/db.js"
 dotenv.config();
-const app=express()
+const app = express()
 import cookieParser from "cookie-parser"
+
+import cors from "cors"
+
+app.use(cors())
 
 //cookies and filemiddleware
 app.use(cookieParser())
@@ -15,15 +19,15 @@ app.use(morgan("tiny"))
 
 // regular middlewares
 app.use(express.json())
-app.use(express.urlencoded({extended:true}))
+app.use(express.urlencoded({ extended: true }))
 
 // import all routes here
 import userRoutes from "./routes/userRoutes.js"
 import expenseRoutes from "./routes/expenseRoutes.js"
 
 // router middleware
-app.use("/api/v1",userRoutes);
-app.use("/api/v1",expenseRoutes);
+app.use("/api/v1", userRoutes);
+app.use("/api/v1", expenseRoutes);
 
 
 export default app;
