@@ -7,9 +7,9 @@ import cookieParser from "cookie-parser"
 
 import cors from "cors"
 
-app.use(cors())
 
 //cookies and filemiddleware
+app.use(cors())
 app.use(cookieParser())
 
 

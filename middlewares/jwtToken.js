@@ -6,31 +6,39 @@ import User from "../models/User.js"
 
 export const jwtToken = async (req, res, next) => {
     const token = req?.headers?.authorization?.split(" ")[1] || ""
-    if (!token) {
-        return res.status(401).json({
-            success: false,
-            message: "No token found"
-        })
+
+    console.log(token)
+
+    if (token) {
+
+
+        const decoded = await jwt.verify(token, process.env.JWT_SECRET);
+
+
+
+        if (!decoded) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid token"
+            })
+        }
+
+        const userId = decoded.id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "No user found"
+            })
+        }
+        req.user = user;
+       return next()
+
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    if (!decoded) {
-        return res.status(401).json({
-            success: false,
-            message: "Invalid token"
-        })
-    }
-
-    const userId = decoded.id;
-
-    const user = await User.findById(userId);
-    if (!user) {
-        return res.status(401).json({
-            success: false,
-            message: "No user found"
-        })
-    }
-    req.user = user;
-    next()
+    return res.status(401).json({
+        success: false,
+        message: "No token found"
+    })
 }

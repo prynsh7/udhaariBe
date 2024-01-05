@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const expenseSchema = new mongoose.Schema({
     friendId: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
         ref: 'Friend',
     },
     description: {

@@ -1,6 +1,8 @@
 import User from "../models/User.js"
 import Expense from "../models/Expense.js"
 import Friend from "../models/Friends.js";
+import mongoose from "mongoose";
+// import {ObjectId} from '';
 
 export const addFriend = async (req, res) => {
     const { email } = req.user;
@@ -22,7 +24,7 @@ export const addFriend = async (req, res) => {
         const peerId = peer._id.toString();
 
         if (userId === peerId) {
-            return res.status(401).json({
+            return res.status(400).json({
                 success: false,
                 message: "User and peer can't be same."
             })
@@ -37,7 +39,7 @@ export const addFriend = async (req, res) => {
         });
 
         if (friendExists) {
-            return res.status(401).json({
+            return res.status(400).json({
                 success: false,
                 message: "Friend already exists."
             })
@@ -68,39 +70,128 @@ export const getFriends = async (req, res) => {
     const { id } = req.user;
     try {
 
+
+
         const friends = await Friend.find({
             $or: [
                 { userId: id },
                 { peerId: id }
-            ]
-        }).populate('userId', 'username').populate('peerId', 'username');
+            ],
+
+        }).populate('userId', 'username').populate('peerId', 'username')
 
 
-        const friendsList = friends.map((friend) => {
-            if (friend.userId?._id?.toString() === id) {
-                console.log();
-                return {
-                    id: friend._id,
-                    userId: friend.peerId?._id,
-                    name: friend.peerId?.username,
+
+
+        // const friendsList = friends.map((friend) => {
+        //     if (friend.userId?._id?.toString() === id) {
+        //         return {
+        //             id: friend._id,
+        //             userId: friend.peerId?._id,
+        //             name: friend.peerId?.username,
+        //         }
+        //     } else {
+        //         return {
+        //             id: friend._id,
+        //             userId: friend.userId?._id,
+        //             name: friend.userId?.username,
+        //         }
+        //     }
+        // }
+        // );
+
+
+
+        // const friendIds = friendsList.map(friend => friend.id);
+
+        // const totalExpenses = await Expense.aggregate([
+        //     {
+        //         $match: {
+        //             friendId: { $in: friendIds },
+        //         }
+        //     },
+        //     {
+        //         $group: {
+        //             _id: "$friendId",
+        //             totalExpense: { $sum: "$amount" }
+        //         }
+        //     }
+        // ]);
+
+        const friendExpenses = await Friend.aggregate([
+            {
+                $match: {
+                    $or: [
+                        { userId: id },
+                        { peerId: id }
+                    ]
                 }
-            } else {
-                return {
-                    id: friend._id,
-                    userId: friend.userId?._id,
-                    name: friend.userId?.username,
+            },
+            {
+                $lookup: {
+                    from: "expenses",
+                    localField: "_id",
+                    foreignField: "friendId",
+                    as: "friendExpenses"
+                },
+            },
+            {
+                $addFields: {
+                    totalExpense: {
+                        $sum: "$friendExpenses.amount"
+                    }
+                }
+            },
+
+            {
+                $addFields: {
+                    otherId: {
+                        $cond: {
+                            if: { $eq: ["$userId", id] },
+                            then: { $toObjectId: "$peerId" },
+                            else: { $toObjectId: "$userId" }
+                        }
+                    }
+                }
+            },
+
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "otherId",
+                    foreignField: "_id",
+                    as: "user",
+                }
+            },
+            {
+                $unwind: "$user"
+            },
+            {
+                $project: {
+                    _id: 1,
+                    userId: 1,
+                    peerId: 1,
+                    status: 1,
+                    createdAt: 1,
+                    updatedAt: 1,
+                    totalExpense: 1,
+                    user: {
+                        _id: 1,
+                        username: 1,
+                        email: 1,
+                        status: 1,
+                        createdAt: 1,
+                        updatedAt: 1,
+                    }
                 }
             }
-        }
-        );
+        ]);
 
         return res.status(200).json({
             success: true,
             message: "Friends fetched successfully.",
-            data: friendsList
+            data: friendExpenses
         });
-
-
 
 
     } catch (error) {
@@ -113,7 +204,7 @@ export const getFriends = async (req, res) => {
 }
 
 export const createExpense = async (req, res) => {
-    const { id } = req.user;
+
     const { friendId, description, settlementType } = req.body;
     let { amount } = req.body;
 
@@ -184,7 +275,6 @@ export const getExpenses = async (req, res) => {
                 message: "No expense found."
             })
         }
-
         return res.status(200).json({
             success: true,
             message: "Expenses fetched successfully.",
@@ -202,10 +292,13 @@ export const getExpenses = async (req, res) => {
 export const getExpensesById = async (req, res) => {
     const { id: friendId } = req.params
 
+
     try {
         const filteredResponse = await Expense.find({
-            friendId: friendId,
+            friendId: friendId
         })
+
+
 
         if (filteredResponse.length === 0) {
             return res.status(401).json({
@@ -214,10 +307,25 @@ export const getExpensesById = async (req, res) => {
             })
         }
 
+        const totalExpenseAggregate = await Expense.aggregate([{
+            $match: {
+                friendId: mongoose.Types.ObjectId(friendId)
+            }
+        },
+        {
+            $group: {
+                _id: "$friendId",
+                totalExpense: { $sum: "$amount" }
+            }
+        }
+        ]);
+
+
         return res.status(200).json({
             success: true,
             message: "Expenses fetched successfully.",
-            data: filteredResponse
+            data: filteredResponse,
+            total: totalExpenseAggregate[0]?.totalExpense || 0
         });
     } catch (error) {
         console.log(error);
